@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { VoiceInput } from '../components/VoiceInput';
 import { RecordTable } from '../components/RecordTable';
 import { CustomerSelect } from '../components/CustomerSelect';
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { BookOpen, Users, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface DairyRecord {
@@ -31,7 +32,6 @@ const Index = () => {
   });
   const [isListening, setIsListening] = useState(false);
 
-  // Load records from localStorage on component mount
   useEffect(() => {
     const savedRecords = localStorage.getItem('dairyRecords');
     if (savedRecords) {
@@ -44,12 +44,10 @@ const Index = () => {
     }
   }, []);
 
-  // Save records to localStorage whenever records change
   useEffect(() => {
     localStorage.setItem('dairyRecords', JSON.stringify(records));
   }, [records]);
 
-  // Save customers to localStorage whenever customers change
   useEffect(() => {
     localStorage.setItem('dairyCustomers', JSON.stringify(customers));
   }, [customers]);
@@ -59,15 +57,10 @@ const Index = () => {
     
     const text = transcript.toLowerCase().trim();
     
-    // Common patterns for Hindi-English mixed input
     const patterns = [
-      // "Ram ko 5 litre doodh 200 rupees"
       /(\w+)\s*(?:ko|को)?\s*(\d+(?:\.\d+)?)\s*(?:litre|लीटर|liter)\s*(?:doodh|दूध|milk)?\s*(?:₹|rupees|रुपए|rs)?\s*(\d+)/i,
-      // "Sita 3 litre 150"
       /(\w+)\s*(\d+(?:\.\d+)?)\s*(?:litre|लीटर|liter)\s*(?:₹|rupees|रुपए|rs)?\s*(\d+)/i,
-      // "Mohan ₹500 paid"
       /(\w+)\s*(?:₹|rupees|रुपए|rs)\s*(\d+)\s*(?:paid|दे दिया|दिया|pay)/i,
-      // "Radha 200 remaining" or "Radha 200 baaki"
       /(\w+)\s*(?:₹|rupees|रुपए|rs)?\s*(\d+)\s*(?:remaining|बाकी|baaki|due)/i
     ];
     
@@ -76,7 +69,6 @@ const Index = () => {
       if (match) {
         const [, name, quantityOrAmount, amountOrStatus] = match;
         
-        // Check if it's a payment entry
         if (text.includes('paid') || text.includes('दे दिया') || text.includes('दिया')) {
           return {
             customerName: name.charAt(0).toUpperCase() + name.slice(1),
@@ -86,7 +78,6 @@ const Index = () => {
           };
         }
         
-        // Check if it's a milk entry
         if (text.includes('litre') || text.includes('लीटर') || text.includes('liter')) {
           return {
             customerName: name.charAt(0).toUpperCase() + name.slice(1),
@@ -96,7 +87,6 @@ const Index = () => {
           };
         }
         
-        // Default case - treat as milk entry
         return {
           customerName: name.charAt(0).toUpperCase() + name.slice(1),
           quantity: parseFloat(quantityOrAmount) || 0,
@@ -121,7 +111,6 @@ const Index = () => {
         paymentStatus: parsed.paymentStatus || 'due'
       });
       
-      // Add customer to list if new
       if (parsed.customerName && !customers.includes(parsed.customerName)) {
         setCustomers(prev => [...prev, parsed.customerName!]);
       }
@@ -138,12 +127,28 @@ const Index = () => {
       return;
     }
 
+    // Enhanced validation
+    const amount = parseFloat(currentRecord.amount);
+    const quantity = parseFloat(currentRecord.quantity) || 0;
+
+    if (amount > 1000) {
+      if (!confirm(`Large amount: ₹${amount}. Are you sure? / बड़ी रकम: ₹${amount}। क्या आप सुनिश्चित हैं?`)) {
+        return;
+      }
+    }
+
+    if (quantity > 20) {
+      if (!confirm(`Large quantity: ${quantity}L. Are you sure? / बड़ी मात्रा: ${quantity}L। क्या आप सुनिश्चित हैं?`)) {
+        return;
+      }
+    }
+
     const newRecord: DairyRecord = {
       id: Date.now().toString(),
       date: new Date().toLocaleDateString('en-IN'),
       customerName: currentRecord.customerName,
-      quantity: parseFloat(currentRecord.quantity) || 0,
-      amount: parseFloat(currentRecord.amount),
+      quantity: quantity,
+      amount: amount,
       paymentStatus: currentRecord.paymentStatus,
       timestamp: Date.now()
     };
@@ -180,6 +185,26 @@ const Index = () => {
           <p className="text-gray-600 text-sm">
             बोलो और रिकॉर्ड हो गया! / Speak and Record!
           </p>
+        </div>
+
+        {/* Quick Navigation */}
+        <div className="grid grid-cols-3 gap-3">
+          <Link to="/ledger">
+            <Button variant="outline" className="w-full h-16 flex flex-col items-center justify-center">
+              <BookOpen className="h-5 w-5 mb-1" />
+              <span className="text-xs">Ledger / खाता</span>
+            </Button>
+          </Link>
+          <Link to="/customers">
+            <Button variant="outline" className="w-full h-16 flex flex-col items-center justify-center">
+              <Users className="h-5 w-5 mb-1" />
+              <span className="text-xs">Customers / ग्राहक</span>
+            </Button>
+          </Link>
+          <Button variant="outline" className="w-full h-16 flex flex-col items-center justify-center" disabled>
+            <BarChart3 className="h-5 w-5 mb-1" />
+            <span className="text-xs">Reports / रिपोर्ट</span>
+          </Button>
         </div>
 
         {/* Voice Input Section */}
@@ -272,13 +297,22 @@ const Index = () => {
             📋 Today's Records / आज के रिकॉर्ड ({getTodaysRecords().length})
           </h2>
           <RecordTable 
-            records={getTodaysRecords().slice(0, 10)} 
+            records={getTodaysRecords().slice(0, 5)} 
             onDelete={deleteRecord}
           />
           {getTodaysRecords().length === 0 && (
             <p className="text-gray-500 text-center py-4">
               कोई रिकॉर्ड नहीं / No records today
             </p>
+          )}
+          {getTodaysRecords().length > 5 && (
+            <div className="text-center mt-4">
+              <Link to="/ledger">
+                <Button variant="outline" size="sm">
+                  View All / सभी देखें ({getTodaysRecords().length})
+                </Button>
+              </Link>
+            </div>
           )}
         </Card>
       </div>
