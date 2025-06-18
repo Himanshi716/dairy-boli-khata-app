@@ -10,20 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BookOpen, Users, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
-
-export interface DairyRecord {
-  id: string;
-  date: string;
-  customerName: string;
-  quantity: number;
-  amount: number;
-  paymentStatus: 'paid' | 'due';
-  timestamp: number;
-}
+import { useDairyRecords, DairyRecord } from '../hooks/useDairyRecords';
+import { useCustomers } from '../hooks/useCustomers';
 
 const Index = () => {
-  const [records, setRecords] = useState<DairyRecord[]>([]);
-  const [customers, setCustomers] = useState<string[]>(['Ram', 'Sita', 'Mohan', 'Radha']);
+  const { records, loading, addRecord, deleteRecord } = useDairyRecords();
+  const { customers, addCustomer } = useCustomers();
   const [currentRecord, setCurrentRecord] = useState({
     customerName: '',
     quantity: '',
@@ -31,26 +23,6 @@ const Index = () => {
     paymentStatus: 'due' as 'paid' | 'due'
   });
   const [isListening, setIsListening] = useState(false);
-
-  useEffect(() => {
-    const savedRecords = localStorage.getItem('dairyRecords');
-    if (savedRecords) {
-      setRecords(JSON.parse(savedRecords));
-    }
-    
-    const savedCustomers = localStorage.getItem('dairyCustomers');
-    if (savedCustomers) {
-      setCustomers(JSON.parse(savedCustomers));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('dairyRecords', JSON.stringify(records));
-  }, [records]);
-
-  useEffect(() => {
-    localStorage.setItem('dairyCustomers', JSON.stringify(customers));
-  }, [customers]);
 
   const parseVoiceInput = (transcript: string): Partial<DairyRecord> | null => {
     console.log('Parsing voice input:', transcript);
@@ -71,27 +43,27 @@ const Index = () => {
         
         if (text.includes('paid') || text.includes('दे दिया') || text.includes('दिया')) {
           return {
-            customerName: name.charAt(0).toUpperCase() + name.slice(1),
+            customer_name: name.charAt(0).toUpperCase() + name.slice(1),
             quantity: 0,
             amount: parseInt(quantityOrAmount),
-            paymentStatus: 'paid'
+            payment_status: 'paid'
           };
         }
         
         if (text.includes('litre') || text.includes('लीटर') || text.includes('liter')) {
           return {
-            customerName: name.charAt(0).toUpperCase() + name.slice(1),
+            customer_name: name.charAt(0).toUpperCase() + name.slice(1),
             quantity: parseFloat(quantityOrAmount),
             amount: parseInt(amountOrStatus),
-            paymentStatus: 'due'
+            payment_status: 'due'
           };
         }
         
         return {
-          customerName: name.charAt(0).toUpperCase() + name.slice(1),
+          customer_name: name.charAt(0).toUpperCase() + name.slice(1),
           quantity: parseFloat(quantityOrAmount) || 0,
           amount: parseInt(amountOrStatus),
-          paymentStatus: 'due'
+          payment_status: 'due'
         };
       }
     }
@@ -99,20 +71,24 @@ const Index = () => {
     return null;
   };
 
-  const handleVoiceResult = (transcript: string) => {
+  const handleVoiceResult = async (transcript: string) => {
     console.log('Voice result received:', transcript);
     const parsed = parseVoiceInput(transcript);
     
     if (parsed) {
       setCurrentRecord({
-        customerName: parsed.customerName || '',
+        customerName: parsed.customer_name || '',
         quantity: parsed.quantity?.toString() || '',
         amount: parsed.amount?.toString() || '',
-        paymentStatus: parsed.paymentStatus || 'due'
+        paymentStatus: parsed.payment_status || 'due'
       });
       
-      if (parsed.customerName && !customers.includes(parsed.customerName)) {
-        setCustomers(prev => [...prev, parsed.customerName!]);
+      if (parsed.customer_name && !customers.find(c => c.name === parsed.customer_name)) {
+        try {
+          await addCustomer(parsed.customer_name);
+        } catch (error) {
+          // Customer might already exist, continue
+        }
       }
       
       toast.success('रिकॉर्ड पार्स हो गया! / Record parsed successfully!');
@@ -121,13 +97,12 @@ const Index = () => {
     }
   };
 
-  const addRecord = () => {
+  const handleAddRecord = async () => {
     if (!currentRecord.customerName || !currentRecord.amount) {
       toast.error('कृपया नाम और रकम भरें / Please fill name and amount');
       return;
     }
 
-    // Enhanced validation
     const amount = parseFloat(currentRecord.amount);
     const quantity = parseFloat(currentRecord.quantity) || 0;
 
@@ -143,36 +118,43 @@ const Index = () => {
       }
     }
 
-    const newRecord: DairyRecord = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString('en-IN'),
-      customerName: currentRecord.customerName,
-      quantity: quantity,
-      amount: amount,
-      paymentStatus: currentRecord.paymentStatus,
-      timestamp: Date.now()
-    };
+    try {
+      await addRecord({
+        date: new Date().toISOString().split('T')[0],
+        customer_name: currentRecord.customerName,
+        quantity: quantity,
+        amount: amount,
+        payment_status: currentRecord.paymentStatus
+      });
 
-    setRecords(prev => [newRecord, ...prev]);
-    setCurrentRecord({
-      customerName: '',
-      quantity: '',
-      amount: '',
-      paymentStatus: 'due'
-    });
-    
-    toast.success('रिकॉर्ड सेव हो गया! / Record saved!');
+      setCurrentRecord({
+        customerName: '',
+        quantity: '',
+        amount: '',
+        paymentStatus: 'due'
+      });
+    } catch (error) {
+      // Error already handled in the hook
+    }
   };
 
   const getTodaysRecords = () => {
-    const today = new Date().toLocaleDateString('en-IN');
+    const today = new Date().toISOString().split('T')[0];
     return records.filter(record => record.date === today);
   };
 
-  const deleteRecord = (id: string) => {
-    setRecords(prev => prev.filter(record => record.id !== id));
-    toast.success('रिकॉर्ड डिलीट हो गया / Record deleted');
-  };
+  const customerNames = customers.map(c => c.name);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-2xl">🥛</div>
+          <div className="mt-2 text-gray-600">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-green-50 p-4">
@@ -232,10 +214,16 @@ const Index = () => {
             <div>
               <Label htmlFor="customer">Customer / ग्राहक</Label>
               <CustomerSelect
-                customers={customers}
+                customers={customerNames}
                 value={currentRecord.customerName}
                 onValueChange={(value) => setCurrentRecord(prev => ({...prev, customerName: value}))}
-                onAddCustomer={(name) => setCustomers(prev => [...prev, name])}
+                onAddCustomer={async (name) => {
+                  try {
+                    await addCustomer(name);
+                  } catch (error) {
+                    // Error already handled in the hook
+                  }
+                }}
               />
             </div>
 
@@ -282,7 +270,7 @@ const Index = () => {
               </Button>
             </div>
 
-            <Button onClick={addRecord} className="w-full bg-orange-500 hover:bg-orange-600 text-lg py-3">
+            <Button onClick={handleAddRecord} className="w-full bg-orange-500 hover:bg-orange-600 text-lg py-3">
               Add Record / रिकॉर्ड जोड़ें
             </Button>
           </div>
