@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -7,7 +6,8 @@ import { RecordTable } from '../components/RecordTable';
 import { FilterControls } from '../components/FilterControls';
 import { ArrowLeft, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDairyRecords, DairyRecord } from '../hooks/useDairyRecords';
+import { useDairyRecords } from '../hooks/useDairyRecords';
+import { DairyRecord } from '../types/dairy';
 
 const Ledger = () => {
   const { records, loading, deleteRecord } = useDairyRecords();
@@ -60,13 +60,13 @@ const Ledger = () => {
 
     // Payment status filter
     if (paymentFilter !== 'all') {
-      filtered = filtered.filter(record => record.payment_status === paymentFilter);
+      filtered = filtered.filter(record => record.paymentStatus === paymentFilter);
     }
 
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(record =>
-        record.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+        record.customerName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -86,8 +86,8 @@ const Ledger = () => {
 
   const totalMilk = filteredRecords.reduce((sum, record) => sum + record.quantity, 0);
   const totalMoney = filteredRecords.reduce((sum, record) => sum + record.amount, 0);
-  const paidAmount = filteredRecords.filter(r => r.payment_status === 'paid').reduce((sum, record) => sum + record.amount, 0);
-  const dueAmount = filteredRecords.filter(r => r.payment_status === 'due').reduce((sum, record) => sum + record.amount, 0);
+  const paidAmount = filteredRecords.filter(r => r.paymentStatus === 'paid').reduce((sum, record) => sum + record.amount, 0);
+  const dueAmount = filteredRecords.filter(r => r.paymentStatus === 'due').reduce((sum, record) => sum + record.amount, 0);
 
   if (loading) {
     return (

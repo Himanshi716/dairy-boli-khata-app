@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, TrendingUp, Calendar } from 'lucide-react';
-import { DairyRecord } from './Index';
+import { DairyRecord } from '../types/dairy';
 
 interface CustomerSummary {
   name: string;
