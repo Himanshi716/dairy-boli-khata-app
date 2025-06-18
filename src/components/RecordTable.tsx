@@ -14,6 +14,18 @@ export const RecordTable = ({ records, onDelete }: RecordTableProps) => {
     return null;
   }
 
+  const getEntryType = (record: DairyRecord) => {
+    if (record.quantity === 0 && record.amount === 0) return 'Absent / गैरहाजिर';
+    if (record.quantity === 0 && record.paymentStatus === 'paid') return 'Payment / भुगतान';
+    return 'Milk Sale / दूध बिक्री';
+  };
+
+  const getEntryTypeColor = (record: DairyRecord) => {
+    if (record.quantity === 0 && record.amount === 0) return 'bg-yellow-100 text-yellow-800';
+    if (record.quantity === 0 && record.paymentStatus === 'paid') return 'bg-green-100 text-green-800';
+    return 'bg-blue-100 text-blue-800';
+  };
+
   return (
     <div className="space-y-2">
       {records.map((record) => (
@@ -22,13 +34,20 @@ export const RecordTable = ({ records, onDelete }: RecordTableProps) => {
             <div className="flex-1">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold text-gray-800">{record.customerName}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  record.paymentStatus === 'paid' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {record.paymentStatus === 'paid' ? 'Paid / दिया' : 'Due / बाकी'}
-                </span>
+                <div className="flex gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEntryTypeColor(record)}`}>
+                    {getEntryType(record)}
+                  </span>
+                  {record.quantity > 0 && (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      record.paymentStatus === 'paid' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {record.paymentStatus === 'paid' ? 'Paid / दिया' : 'Due / बाकी'}
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
@@ -38,7 +57,7 @@ export const RecordTable = ({ records, onDelete }: RecordTableProps) => {
                 </div>
                 <div>
                   <span className="block font-medium">Amount</span>
-                  <span>₹{record.amount}</span>
+                  <span>{record.amount > 0 ? `₹${record.amount}` : '-'}</span>
                 </div>
                 <div>
                   <span className="block font-medium">Time</span>

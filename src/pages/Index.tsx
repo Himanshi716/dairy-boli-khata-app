@@ -5,6 +5,8 @@ import { VoiceInput } from '../components/VoiceInput';
 import { RecordTable } from '../components/RecordTable';
 import { CustomerSelect } from '../components/CustomerSelect';
 import { DailyTotals } from '../components/DailyTotals';
+import { EntryTypeSelector } from '../components/EntryTypeSelector';
+import { DateFilter } from '../components/DateFilter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +26,8 @@ const Index = () => {
     amount: '',
     paymentStatus: 'due' as 'paid' | 'due'
   });
+  const [entryType, setEntryType] = useState<'milk' | 'payment' | 'absent'>('milk');
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isListening, setIsListening] = useState(false);
 
   const parseVoiceInput = (transcript: string): Partial<DairyRecord> | null => {
@@ -85,6 +89,15 @@ const Index = () => {
         paymentStatus: parsed.paymentStatus || 'due'
       });
       
+      // Auto-detect entry type from voice
+      if (transcript.toLowerCase().includes('absent') || transcript.toLowerCase().includes('गैरहाजिर')) {
+        setEntryType('absent');
+      } else if (transcript.toLowerCase().includes('paid') || transcript.toLowerCase().includes('दिया')) {
+        setEntryType('payment');
+      } else {
+        setEntryType('milk');
+      }
+      
       if (parsed.customerName && !customers.find(c => c.name === parsed.customerName)) {
         try {
           await addCustomer(parsed.customerName);
@@ -100,33 +113,56 @@ const Index = () => {
   };
 
   const handleAddRecord = async () => {
-    if (!currentRecord.customerName || !currentRecord.amount) {
-      toast.error('कृपया नाम और रकम भरें / Please fill name and amount');
+    if (!currentRecord.customerName) {
+      toast.error('कृपया नाम भरें / Please fill customer name');
       return;
     }
 
-    const amount = parseFloat(currentRecord.amount);
-    const quantity = parseFloat(currentRecord.quantity) || 0;
+    let quantity = 0;
+    let amount = 0;
+    let paymentStatus: 'paid' | 'due' = 'due';
 
-    if (amount > 1000) {
-      if (!confirm(`Large amount: ₹${amount}. Are you sure? / बड़ी रकम: ₹${amount}। क्या आप सुनिश्चित हैं?`)) {
-        return;
-      }
+    switch (entryType) {
+      case 'milk':
+        if (!currentRecord.quantity || !currentRecord.amount) {
+          toast.error('कृपया दूध की मात्रा और रकम भरें / Please fill milk quantity and amount');
+          return;
+        }
+        quantity = parseFloat(currentRecord.quantity);
+        amount = parseFloat(currentRecord.amount);
+        paymentStatus = currentRecord.paymentStatus;
+        break;
+      
+      case 'payment':
+        if (!currentRecord.amount) {
+          toast.error('कृपया रकम भरें / Please fill payment amount');
+          return;
+        }
+        quantity = 0;
+        amount = parseFloat(currentRecord.amount);
+        paymentStatus = 'paid';
+        break;
+      
+      case 'absent':
+        quantity = 0;
+        amount = 0;
+        paymentStatus = 'due';
+        break;
     }
 
-    if (quantity > 20) {
-      if (!confirm(`Large quantity: ${quantity}L. Are you sure? / बड़ी मात्रा: ${quantity}L। क्या आप सुनिश्चित हैं?`)) {
+    if (amount > 1000 && entryType !== 'payment') {
+      if (!confirm(`Large amount: ₹${amount}. Are you sure? / बड़ी रकम: ₹${amount}। क्या आप सुनिश्चित हैं?`)) {
         return;
       }
     }
 
     try {
       await addRecord({
-        date: new Date().toISOString().split('T')[0],
+        date: selectedDate.toISOString().split('T')[0],
         customerName: currentRecord.customerName,
         quantity: quantity,
         amount: amount,
-        paymentStatus: currentRecord.paymentStatus
+        paymentStatus: paymentStatus
       });
 
       setCurrentRecord({
@@ -140,9 +176,9 @@ const Index = () => {
     }
   };
 
-  const getTodaysRecords = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return records.filter(record => record.date === today);
+  const getSelectedDateRecords = () => {
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    return records.filter(record => record.date === dateStr);
   };
 
   const customerNames = customers.map(c => c.name);
@@ -191,6 +227,14 @@ const Index = () => {
           </Button>
         </div>
 
+        {/* Date Selection */}
+        <Card className="p-4">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">
+            📅 Select Date / तारीख चुनें
+          </h2>
+          <DateFilter selectedDate={selectedDate} onDateChange={setSelectedDate} />
+        </Card>
+
         {/* Voice Input Section */}
         <Card className="p-6 border-2 border-orange-200">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 text-center">
@@ -202,7 +246,7 @@ const Index = () => {
             setIsListening={setIsListening}
           />
           <div className="mt-4 text-xs text-gray-500 text-center">
-            <p>"Ram ko 5 litre ₹200" या "Sita 300 paid" बोलें</p>
+            <p>"Ram ko 5 litre ₹200" या "Sita 300 paid" या "Mohan absent" बोलें</p>
           </div>
         </Card>
 
@@ -213,6 +257,11 @@ const Index = () => {
           </h2>
           
           <div className="space-y-4">
+            <div>
+              <Label>Entry Type / एंट्री का प्रकार</Label>
+              <EntryTypeSelector value={entryType} onChange={setEntryType} />
+            </div>
+
             <div>
               <Label htmlFor="customer">Customer / ग्राहक</Label>
               <CustomerSelect
@@ -229,48 +278,74 @@ const Index = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="quantity">Litres / लीटर</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="0.5"
-                  value={currentRecord.quantity}
-                  onChange={(e) => setCurrentRecord(prev => ({...prev, quantity: e.target.value}))}
-                  placeholder="5"
-                  className="text-lg"
-                />
+            {entryType === 'milk' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="quantity">Litres / लीटर</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    step="0.5"
+                    value={currentRecord.quantity}
+                    onChange={(e) => setCurrentRecord(prev => ({...prev, quantity: e.target.value}))}
+                    placeholder="5"
+                    className="text-lg"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="amount">Amount / रुपए</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={currentRecord.amount}
+                    onChange={(e) => setCurrentRecord(prev => ({...prev, amount: e.target.value}))}
+                    placeholder="200"
+                    className="text-lg"
+                  />
+                </div>
               </div>
+            )}
+
+            {entryType === 'payment' && (
               <div>
-                <Label htmlFor="amount">Amount / रुपए</Label>
+                <Label htmlFor="payment-amount">Payment Amount / भुगतान राशि</Label>
                 <Input
-                  id="amount"
+                  id="payment-amount"
                   type="number"
                   value={currentRecord.amount}
                   onChange={(e) => setCurrentRecord(prev => ({...prev, amount: e.target.value}))}
-                  placeholder="200"
+                  placeholder="500"
                   className="text-lg"
                 />
               </div>
-            </div>
+            )}
 
-            <div className="flex gap-4">
-              <Button
-                variant={currentRecord.paymentStatus === 'due' ? 'default' : 'outline'}
-                onClick={() => setCurrentRecord(prev => ({...prev, paymentStatus: 'due'}))}
-                className="flex-1"
-              >
-                Due / बाकी
-              </Button>
-              <Button
-                variant={currentRecord.paymentStatus === 'paid' ? 'default' : 'outline'}
-                onClick={() => setCurrentRecord(prev => ({...prev, paymentStatus: 'paid'}))}
-                className="flex-1"
-              >
-                Paid / दिया
-              </Button>
-            </div>
+            {entryType === 'absent' && (
+              <div className="p-4 bg-yellow-50 rounded-lg text-center">
+                <p className="text-sm text-yellow-700">
+                  मार्क करने के लिए केवल ग्राहक का नाम चुनें / Just select customer name to mark absent
+                </p>
+              </div>
+            )}
+
+            {entryType === 'milk' && (
+              <div className="flex gap-4">
+                <Button
+                  variant={currentRecord.paymentStatus === 'due' ? 'default' : 'outline'}
+                  onClick={() => setCurrentRecord(prev => ({...prev, paymentStatus: 'due'}))}
+                  className="flex-1"
+                >
+                  Due / बाकी
+                </Button>
+                <Button
+                  variant={currentRecord.paymentStatus === 'paid' ? 'default' : 'outline'}
+                  onClick={() => setCurrentRecord(prev => ({...prev, paymentStatus: 'paid'}))}
+                  className="flex-1"
+                >
+                  Paid / दिया
+                </Button>
+              </div>
+            )}
 
             <Button onClick={handleAddRecord} className="w-full bg-orange-500 hover:bg-orange-600 text-lg py-3">
               Add Record / रिकॉर्ड जोड़ें
@@ -279,27 +354,27 @@ const Index = () => {
         </Card>
 
         {/* Daily Totals */}
-        <DailyTotals records={getTodaysRecords()} />
+        <DailyTotals records={getSelectedDateRecords()} />
 
-        {/* Today's Records */}
+        {/* Selected Date Records */}
         <Card className="p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            📋 Today's Records / आज के रिकॉर्ड ({getTodaysRecords().length})
+            📋 Records for {selectedDate.toLocaleDateString('en-IN')} ({getSelectedDateRecords().length})
           </h2>
           <RecordTable 
-            records={getTodaysRecords().slice(0, 5)} 
+            records={getSelectedDateRecords().slice(0, 5)} 
             onDelete={deleteRecord}
           />
-          {getTodaysRecords().length === 0 && (
+          {getSelectedDateRecords().length === 0 && (
             <p className="text-gray-500 text-center py-4">
-              कोई रिकॉर्ड नहीं / No records today
+              कोई रिकॉर्ड नहीं / No records for this date
             </p>
           )}
-          {getTodaysRecords().length > 5 && (
+          {getSelectedDateRecords().length > 5 && (
             <div className="text-center mt-4">
               <Link to="/ledger">
                 <Button variant="outline" size="sm">
-                  View All / सभी देखें ({getTodaysRecords().length})
+                  View All / सभी देखें ({getSelectedDateRecords().length})
                 </Button>
               </Link>
             </div>
