@@ -1,6 +1,6 @@
 
 import { Card } from '@/components/ui/card';
-import { DairyRecord } from '../pages/Index';
+import { DairyRecord } from '../types/dairy';
 
 interface DailyTotalsProps {
   records: DairyRecord[];

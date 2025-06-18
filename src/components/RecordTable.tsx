@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Trash2 } from 'lucide-react';
-import { DairyRecord } from '../pages/Index';
+import { DairyRecord } from '../types/dairy';
 
 interface RecordTableProps {
   records: DairyRecord[];
@@ -42,10 +42,10 @@ export const RecordTable = ({ records, onDelete }: RecordTableProps) => {
                 </div>
                 <div>
                   <span className="block font-medium">Time</span>
-                  <span>{new Date(record.timestamp).toLocaleTimeString('en-IN', { 
+                  <span>{record.created_at ? new Date(record.created_at).toLocaleTimeString('en-IN', { 
                     hour: '2-digit', 
                     minute: '2-digit' 
-                  })}</span>
+                  }) : '-'}</span>
                 </div>
               </div>
             </div>

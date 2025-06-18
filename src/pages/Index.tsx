@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { VoiceInput } from '../components/VoiceInput';
@@ -10,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BookOpen, Users, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDairyRecords, DairyRecord } from '../hooks/useDairyRecords';
+import { useDairyRecords } from '../hooks/useDairyRecords';
 import { useCustomers } from '../hooks/useCustomers';
+import { DairyRecord } from '../types/dairy';
 
 const Index = () => {
   const { records, loading, addRecord, deleteRecord } = useDairyRecords();
@@ -43,27 +45,27 @@ const Index = () => {
         
         if (text.includes('paid') || text.includes('दे दिया') || text.includes('दिया')) {
           return {
-            customer_name: name.charAt(0).toUpperCase() + name.slice(1),
+            customerName: name.charAt(0).toUpperCase() + name.slice(1),
             quantity: 0,
             amount: parseInt(quantityOrAmount),
-            payment_status: 'paid'
+            paymentStatus: 'paid'
           };
         }
         
         if (text.includes('litre') || text.includes('लीटर') || text.includes('liter')) {
           return {
-            customer_name: name.charAt(0).toUpperCase() + name.slice(1),
+            customerName: name.charAt(0).toUpperCase() + name.slice(1),
             quantity: parseFloat(quantityOrAmount),
             amount: parseInt(amountOrStatus),
-            payment_status: 'due'
+            paymentStatus: 'due'
           };
         }
         
         return {
-          customer_name: name.charAt(0).toUpperCase() + name.slice(1),
+          customerName: name.charAt(0).toUpperCase() + name.slice(1),
           quantity: parseFloat(quantityOrAmount) || 0,
           amount: parseInt(amountOrStatus),
-          payment_status: 'due'
+          paymentStatus: 'due'
         };
       }
     }
@@ -77,15 +79,15 @@ const Index = () => {
     
     if (parsed) {
       setCurrentRecord({
-        customerName: parsed.customer_name || '',
+        customerName: parsed.customerName || '',
         quantity: parsed.quantity?.toString() || '',
         amount: parsed.amount?.toString() || '',
-        paymentStatus: parsed.payment_status || 'due'
+        paymentStatus: parsed.paymentStatus || 'due'
       });
       
-      if (parsed.customer_name && !customers.find(c => c.name === parsed.customer_name)) {
+      if (parsed.customerName && !customers.find(c => c.name === parsed.customerName)) {
         try {
-          await addCustomer(parsed.customer_name);
+          await addCustomer(parsed.customerName);
         } catch (error) {
           // Customer might already exist, continue
         }
@@ -121,10 +123,10 @@ const Index = () => {
     try {
       await addRecord({
         date: new Date().toISOString().split('T')[0],
-        customer_name: currentRecord.customerName,
+        customerName: currentRecord.customerName,
         quantity: quantity,
         amount: amount,
-        payment_status: currentRecord.paymentStatus
+        paymentStatus: currentRecord.paymentStatus
       });
 
       setCurrentRecord({
